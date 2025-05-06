@@ -17,13 +17,25 @@ from calendar import monthrange
 from datetime import datetime
 
 def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
+    # Formatierung Variablen
+    sensor_type = str(sensor_type)
+    sensor_type = sensor_type.strip()
+
+    sensor_ID = str(sensor_ID)
+    sensor_ID = sensor_ID.strip()
+
+    start_year = int(start_year)
+    end_year = int(end_year)
+    start_month = int(start_month)
+    end_month = int(end_month)
+    
     # Datumsvariablen
     now = datetime.now()
     current_year = now.year
     current_month = now.month
     current_day = now.day
 
-    # Prüfungen, müssen noch implementiert werden
+    # Prüfungen
     # Prüfungsvariable, muss nach allen Prüfungen True sein, damit Funktion ausgeführt wird
     flag_continue = True
     return_text = 'Ungültige Eingabe'
