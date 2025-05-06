@@ -9,14 +9,26 @@
 # if month, day < 10 mit 0 davor
 # liste hinzufügen
 
+# Anforderungen Feinstaubprojekt
+# sensor_type = 'sds011'
+
 from calendar import monthrange
 
-def url(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
+def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
+    # Prüfungen, müssen noch implementiert werden
+    # start year <= end_year
+    # start_month <= end_month
+    # start_year und end_year muss zwischen 2015 und aktuellem Jahr sein
+    # start_month und end_month müssen zwischen 1 und 12 sein; wenn end_year = aktuelles Jahr, muss end_month <= aktueller Monat
+    # Wenn end_month = aktueller Monat, darf for day in range() nur bis zum aktuellen Tag gehen
+
     urls = []
     start = start_month
     end = end_month
     for year in range(start_year, end_year + 1):
         if start_year < end_year:
+            if year == start_year:
+                end = 12
             if start_year < year < end_year:
                 start = 1
                 end = 12
@@ -32,6 +44,6 @@ def url(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_
                 urls.append(link)
     return urls
 
-print(url('bme280', 250, 2022, 2024, 1, 5))
+print(GenerateUrl('bme280', 250, 2022, 2023, 5, 5))
 
 
