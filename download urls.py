@@ -1,14 +1,3 @@
-# year, sensor_type, sensor_ID, start_month, end_month einlesen
-# URL Ausgabe
-# jeder Monat hat 31 Tage
-# Struktur: 'archive.sensor.community/YYYY-MM-DD/YYYY-MM-DD_sensor_type_sensor_sensor_ID.csv'
-# bei Jahr <= 2023: 'archive.sensor.community/YYYY/YYYY-MM-DD/YYYY-MM-DD_sensor_type_sensor_sensor_ID.csv.gz'
-# Vorgehensweise: Funktion definieren, 5 parameter
-# for month
-# for day
-# if month, day < 10 mit 0 davor
-# liste hinzufügen
-
 # Anforderungen Feinstaubprojekt
 # sensor_type = 'sds011'
 # Was passiert, wenn eine url nicht gefunden wurde?
