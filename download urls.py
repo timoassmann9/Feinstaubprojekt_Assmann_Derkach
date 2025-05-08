@@ -35,10 +35,11 @@ def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int
     current_month = now.month
     current_day = now.day
 
-    # Prüfungen
     # Prüfungsvariable, muss nach allen Prüfungen True sein, damit Funktion ausgeführt wird
     flag_continue = True
     return_text = 'Ungültige Eingabe'
+
+    # Prüfungen
     # start year <= end_year
     if start_year > end_year:
         flag_continue = False
