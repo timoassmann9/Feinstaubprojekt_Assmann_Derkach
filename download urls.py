@@ -4,6 +4,7 @@
 
 from calendar import monthrange
 from datetime import datetime
+import urllib.request
 
 def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
     # Formatierung Variablen
@@ -77,13 +78,17 @@ def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int
                     end_day = current_day - 1
                 for day in range (1, end_day + 1):
                     if year > 2023:
-                        link = f'archive.sensor.community/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{sensor_type}_sensor_{sensor_ID}.csv'
+                        link = f'https://archive.sensor.community/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{sensor_type}_sensor_{sensor_ID}.csv'
                     if year <= 2023:
-                        link = f'archive.sensor.community/{year}/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{sensor_type}_sensor_{sensor_ID}.csv.gz'
+                        link = f'https://archive.sensor.community/{year}/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{sensor_type}_sensor_{sensor_ID}.csv.gz'
                     urls.append(link)
         return urls
     else: return return_text
 
-print(GenerateUrl('bme280', 250, 2025, 2025, 4, 5))
+# print(GenerateUrl('bme280', 250, 2025, 2025, 4, 5))
 
+url = GenerateUrl('sds011', 11332, 2023, 2023, 1, 1)[0]
+print(url)
 
+file_Path = 'test2.csv'
+urllib.request.urlretrieve(url, file_Path)
