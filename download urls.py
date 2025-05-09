@@ -4,7 +4,10 @@
 
 from calendar import monthrange
 from datetime import datetime
-import urllib.request
+import requests
+import gzip
+import shutil
+import os
 
 def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
     # Formatierung Variablen
@@ -87,8 +90,33 @@ def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int
 
 # print(GenerateUrl('bme280', 250, 2025, 2025, 4, 5))
 
-url = GenerateUrl('sds011', 11332, 2023, 2023, 1, 1)[0]
+url = GenerateUrl('sds011', 1, 2023, 2023, 1, 1)[0]
 print(url)
 
-file_Path = 'test2.csv'
-urllib.request.urlretrieve(url, file_Path)
+# Download
+response = requests.get(url)
+file_Path_start = url.rfind('/')
+file_Path = 'Feinstaubprojekt_Assmann_Derkach' + url[file_Path_start:]
+print(file_Path)
+
+if response.status_code == 200:
+    # Datei herunterladen
+    with open(file_Path, 'wb') as file:
+        file.write(response.content)
+    # Wenn komprimierte Datei, dann entpacken und kopieren
+    if file_Path.endswith('.gz'):
+        with gzip.open(file_Path, 'rb') as f_in:
+            with open(file_Path[:-3], 'wb') as f_out:
+                shutil.copyfileobj(f_in, f_out)
+        # Komprimierte Datei löschen
+        if os.path.exists(file_Path):
+            os.remove(file_Path)
+        else:
+            print('The file does not exist')
+    print('File downloaded successfully')
+else:
+    print('Download fehlgeschlagen; url existiert nicht')
+
+        
+# Urls durchgehen, downloaden, was wenn url nicht existiert?
+
