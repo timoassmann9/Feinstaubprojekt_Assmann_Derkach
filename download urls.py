@@ -9,7 +9,7 @@ import gzip
 import shutil
 import os
 
-def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
+def GenerateUrls(sensor_type: str, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
     # Formatierung Variablen
     sensor_type = str(sensor_type)
     sensor_type = sensor_type.strip()
@@ -90,7 +90,7 @@ def GenerateUrl(sensor_type: str, sensor_ID: str, start_year: int, end_year: int
 
 # print(GenerateUrl('bme280', 250, 2025, 2025, 4, 5))
 
-url = GenerateUrl('sds011', 1, 2023, 2023, 1, 1)[0]
+url = GenerateUrls('sds011', 92, 2023, 2023, 1, 1)[0]
 print(url)
 
 # Download
