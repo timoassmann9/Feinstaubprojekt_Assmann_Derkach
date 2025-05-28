@@ -1,0 +1,36 @@
+import sqlite3 as sql
+from csv import DictReader
+
+con = sql.connect('Feinstaubprojekt_Assmann_Derkach/testdb.db')
+cur = con.cursor()
+file_name = '2023-01-01_sds011_sensor_92.csv'
+
+with open('Feinstaubprojekt_Assmann_Derkach/2023-01-01_sds011_sensor_92.csv', 'r') as file:
+	reader = DictReader(file, delimiter=';')
+	next(reader)
+	for row in reader:
+		count = 1
+		sensor_id = int(row['sensor_id'])
+		datumzeit = row['timestamp']
+		pm2_5 = row['P1']
+		pm10 = row['P2']
+		standort = int(row['location'])
+		lat = row['lat']
+		lon = row['lon']
+
+		uid = f'{file_name}_{count}'
+
+		data = {
+			'UID': uid,
+			'SensorID': sensor_id,
+			'DatumZeit': datumzeit, 
+			'PM2_5': pm2_5, 
+			'PM10': pm10, 
+			'Standort': standort, 
+			'lat': lat, 
+			'lon': lon
+		}
+		cur.execute('INSERT INTO Feinstaubanalyse VALUES(:UID, :SensorID, :DatumZeit, :PM2_5, :PM10, :Standort, :lat, :lon)', data)
+		con.commit()
+
+		count += 1
