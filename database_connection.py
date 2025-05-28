@@ -8,8 +8,8 @@ file_name = '2023-01-01_sds011_sensor_92.csv'
 with open('Feinstaubprojekt_Assmann_Derkach/2023-01-01_sds011_sensor_92.csv', 'r') as file:
 	reader = DictReader(file, delimiter=';')
 	next(reader)
+	count = 1
 	for row in reader:
-		count = 1
 		sensor_id = int(row['sensor_id'])
 		datumzeit = row['timestamp']
 		pm2_5 = row['P1']
