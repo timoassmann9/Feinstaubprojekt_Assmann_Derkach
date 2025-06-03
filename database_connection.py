@@ -30,7 +30,12 @@ with open('Feinstaubprojekt_Assmann_Derkach/2023-01-01_sds011_sensor_92.csv', 'r
 			'lat': lat, 
 			'lon': lon
 		}
-		cur.execute('INSERT INTO Feinstaubanalyse VALUES(:UID, :SensorID, :DatumZeit, :PM2_5, :PM10, :Standort, :lat, :lon)', data)
-		con.commit()
+		# Nur Insert von neuen Datensätzen
+		# result_exists ist 1, wenn der Datensatz existiert, ansonsten 0
+		check_exists = cur.execute(f"SELECT 1 FROM Feinstaubanalyse WHERE UID = '{uid}'")
+		result_exists = check_exists.fetchone()
+		if result_exists[0] == 0:
+			cur.execute('INSERT INTO Feinstaubanalyse VALUES(:UID, :SensorID, :DatumZeit, :PM2_5, :PM10, :Standort, :lat, :lon)', data)
+			con.commit()
 
 		count += 1

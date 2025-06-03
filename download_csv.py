@@ -11,7 +11,7 @@ for url in url_list:
     response = requests.get(url)
     url_end = url.rfind('/')
     file_name = url[url_end:]
-    file_Path = 'Feinstaubprojekt_Assmann_Derkach' + file_name
+    file_Path = 'Feinstaubprojekt_Assmann_Derkach/files' + file_name
     print(file_Path)
 
     if response.status_code == 200:
