@@ -1,3 +1,14 @@
+from calendar import monthrange
+from datetime import datetime
+from csv import DictReader
+import requests
+import gzip
+import shutil
+import os
+import sqlite3 as sql
+import tkinter as tk
+from tkinter import ttk
+
 class analyticsdata():
 	def __init__(self, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
 		self.sensor_type = 'sds011'
@@ -26,7 +37,6 @@ class analyticsdata():
 
 		# Prüfungsvariable, muss nach allen Prüfungen True sein, damit Funktion ausgeführt wird
 		flag_continue = True
-		return_text = 'Ungültige Eingabe'
 
 		# Prüfungen
 		# start year <= end_year
@@ -57,7 +67,6 @@ class analyticsdata():
 
 		# Ausführen der Funktion
 		if flag_continue:
-			urls = []
 			start = self.start_month
 			end = self.end_month
 			for year in range(self.start_year, self.end_year + 1):
@@ -75,14 +84,13 @@ class analyticsdata():
 					# Wenn year = aktuelles Jahr und month = aktueller Monat, darf for day in range() nur bis zum vorherigen Tag gehen
 					if year == current_year and month == current_month:
 						end_day = current_day - 1
-					for day in range (1, end_day + 1):
+					for day in range(1, end_day + 1):
 						if year > 2023:
 							link = f'https://archive.sensor.community/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{self.sensor_type}_sensor_{self.sensor_ID}.csv'
 						if year <= 2023:
 							link = f'https://archive.sensor.community/{year}/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{self.sensor_type}_sensor_{self.sensor_ID}.csv.gz'
-						urls.append(link)
-			self.urls = urls
-		else: return return_text
+						self.urls.append(link)
+		else: print('Ungültige Eingabe')
 
 	def download_csv(self):
 		for url in self.urls:
@@ -108,3 +116,28 @@ class analyticsdata():
 				print(f'File {file_name} downloaded successfully')
 			else:
 				print(f'Download fehlgeschlagen; url {url} existiert nicht')
+
+# Hier Datenbankverbindung aufbauen
+
+
+# Hier GUI zusammenbauen
+# Elemente:
+	# Eingabefeld (SensorID: int)
+	# Comboboxen (2 mal, nebeneinander für start und end datum)
+		# Jahr
+		# Monat
+# Aus den Eingaben ein Klassenobjekt erstellen
+# Erstmal bis dahin
+
+class EingabeGUI():
+	def __init__(self):
+		self.root = tk.Tk()
+		self.root.title('Zeitraum auswählen')
+		self.root.geometry('400x300')
+
+		frame = ttk.Frame(self.root, padding=10)
+		frame.grid(row=0, column=0, sticky='NSEW')
+
+mydata = analyticsdata('11', 2015, 2017, 2, 5)
+print(mydata.urls)
+mydata.GenerateUrls()

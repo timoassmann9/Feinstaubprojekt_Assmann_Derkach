@@ -1,6 +1,3 @@
-import sqlite3 as sql
-from csv import DictReader
-
 con = sql.connect('Feinstaubprojekt_Assmann_Derkach/testdb.db')
 cur = con.cursor()
 file_name = '2023-01-01_sds011_sensor_92.csv'

@@ -1,9 +1,3 @@
-from generate_urls import GenerateUrls
-import requests
-import gzip
-import shutil
-import os
-
 url_list = GenerateUrls('sds011', 140, 2023, 2023, 1, 1)
 
 # Download

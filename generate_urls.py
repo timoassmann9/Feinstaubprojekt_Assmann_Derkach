@@ -76,7 +76,7 @@ def GenerateUrls(sensor_type: str, sensor_ID: str, start_year: int, end_year: in
                 # Wenn year = aktuelles Jahr und month = aktueller Monat, darf for day in range() nur bis zum vorherigen Tag gehen
                 if year == current_year and month == current_month:
                     end_day = current_day - 1
-                for day in range (1, end_day + 1):
+                for day in range(1, end_day + 1):
                     if year > 2023:
                         link = f'https://archive.sensor.community/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{sensor_type}_sensor_{sensor_ID}.csv'
                     if year <= 2023:
