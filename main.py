@@ -146,9 +146,14 @@ class EingabeGUI():
 		entry.grid(column=0, row=1, sticky='nsew', pady=5)
 		entry.insert(0, 'SensorID')
 		
-		ttk.Label(frame2, text='Startdatum:').grid(column=0, row=2, sticky='w')
+		ttk.Label(frame2, text='Startjahr:').grid(column=0, row=2, sticky='w')
 		combo = ttk.Combobox(frame2, values=[x for x in range(2015, datetime.now().year + 1)])
 		combo.grid(column=0, row=3, sticky='w', pady=5)
+
+		ttk.Label(frame2, text='Startmonat:').grid(column=1, row=2, sticky='w')
+		combo = ttk.Combobox(frame2, values=[x for x in range(1, 13)])
+		combo.grid(column=1, row=3, sticky='w', pady=5)
+
 
 EingabeGUI().root.mainloop()
 mydata = analyticsdata('11', 2015, 2017, 2, 5)
