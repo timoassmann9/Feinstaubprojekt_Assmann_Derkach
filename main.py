@@ -135,9 +135,22 @@ class EingabeGUI():
 		self.root.title('Zeitraum auswählen')
 		self.root.geometry('400x300')
 
-		frame = ttk.Frame(self.root, padding=10)
-		frame.grid(row=0, column=0, sticky='NSEW')
+		frame1 = ttk.Frame(self.root, padding=10, relief='raised')
+		frame1.grid(row=0, column=0, rowspan=2, columnspan=1, sticky='nsew')
 
+		frame2 = ttk.Frame(self.root, padding=10, relief='raised')
+		frame2.grid(row=2, column=0, sticky='NSEW')
+
+		ttk.Label(frame1, text='SensorID:', width=50).grid(column=0, row=0, sticky='NSEW')
+		entry = ttk.Entry(frame1)
+		entry.grid(column=0, row=1, sticky='nsew', pady=5)
+		entry.insert(0, 'SensorID')
+		
+		ttk.Label(frame2, text='Startdatum:').grid(column=0, row=2, sticky='w')
+		combo = ttk.Combobox(frame2, values=[x for x in range(2015, datetime.now().year + 1)])
+		combo.grid(column=0, row=3, sticky='w', pady=5)
+
+EingabeGUI().root.mainloop()
 mydata = analyticsdata('11', 2015, 2017, 2, 5)
 print(mydata.urls)
 mydata.GenerateUrls()
