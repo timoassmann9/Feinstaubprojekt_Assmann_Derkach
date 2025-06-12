@@ -88,6 +88,9 @@ class Analyticsdata():
 			url_end = url.rfind('/')
 			file_name = url[url_end:]
 			file_Path = 'Feinstaubprojekt_Assmann_Derkach/files' + file_name
+			if os.path.exists(file_Path):
+				print(f'Datei {file_name} existiert bereits')
+				continue
 
 			try:
 				response = requests.get(url)
@@ -327,7 +330,7 @@ class EingabeGUI():
 			self.analytics_data.download_csv()
 			
 			self.status_label.config(text='Download abgeschlossen!', foreground='green')
-			messagebox.showinfo('Download', 'Datendownload erfolgreich abgeschlossen!')
+			messagebox.showinfo('Download', f'{self.analytics_data.downloads} Dateien wurden erfolgreich heruntergeladen!')
 			
 		except Exception as e:
 			messagebox.showerror('Fehler', f'Fehler beim Download: {str(e)}')
@@ -337,6 +340,3 @@ class EingabeGUI():
 			self.create_button.config(state='normal')
 
 EingabeGUI().root.mainloop()
-mydata = Analyticsdata('11', 2015, 2017, 2, 5)
-print(mydata.urls)
-mydata.generate_urls()
