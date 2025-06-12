@@ -342,3 +342,5 @@ class EingabeGUI():
 			self.create_button.config(state='normal')
 
 EingabeGUI().root.mainloop()
+
+# sensor ids ermitteln: requests mit vielen ids stellen, wenn funktioniert, speichern
