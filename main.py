@@ -19,6 +19,7 @@ class Analyticsdata():
 		self.start_month = start_month
 		self.end_month = end_month
 		self.urls = []
+		self.downloads = None
 
 		# Formatierung Variablen
 		self.sensor_ID = str(self.sensor_ID)
@@ -36,72 +37,62 @@ class Analyticsdata():
 		current_month = now.month
 		current_day = now.day
 
-		# Prüfungsvariable, muss nach allen Prüfungen True sein, damit Funktion ausgeführt wird
-		flag_continue = True
-
 		# Prüfungen
-		# start year <= end_year
-		if self.start_year > self.end_year:
-			flag_continue = False
-		# start_month <= end_month
-		if self.start_month > self.end_month:
-			flag_continue = False
-		# start_year und end_year muss zwischen 2015 und aktuellem Jahr sein
-		if self.start_year < 2015 or self.start_year > current_year:
-			flag_continue = False
+		if (self.start_year or self.end_year) < 2015 or (self.start_year or self.end_year) > current_year:
+			print('start_year und end_year muss zwischen 2015 und aktuellem Jahr sein')
+			return
 
-		if self.end_year < 2015 or self.end_year > current_year:
-			flag_continue = False
-		# start_month und end_month müssen zwischen 1 und 12 sein; wenn end_year = aktuelles Jahr, muss end_month <= aktueller Monat
-		if self.start_month < 1 or self.start_month > 12:
-			flag_continue = False
-
-		if self.end_month < 1 or self.end_month > 12:
-			flag_continue = False
+		if (self.start_month or self.end_month) < 1 or (self.start_month or self.end_month) > 12:
+			print('start_month und end_month müssen zwischen 1 und 12 sein')
+			return
 
 		if self.end_year == current_year and self.end_month > current_month:
-			flag_continue = False
+			print('end_month darf bei aktuellem Jahr nicht größer als der aktuelle Monat sein')
+			return
 
-		# frühestes Datum: 2015-10-01
 		if self.start_year == 2015 and self.start_month < 10:
-			flag_continue = False
+			print('start_month darf im Jahr 2015 nicht kleiner als 10 sein')
+			return
 
 		# Ausführen der Funktion
-		if flag_continue:
-			start = self.start_month
-			end = self.end_month
-			for year in range(self.start_year, self.end_year + 1):
-				if self.start_year < self.end_year:
-					if year == self.start_year:
-						end = 12
-					if self.start_year < year < self.end_year:
-						start = 1
-						end = 12
-					if year == self.end_year:
-						start = 1
-						end = self.end_month        
-				for month in range(start, end + 1):
-					end_day = monthrange(year, month)[1]
-					# Wenn year = aktuelles Jahr und month = aktueller Monat, darf for day in range() nur bis zum vorherigen Tag gehen
-					if year == current_year and month == current_month:
-						end_day = current_day - 1
-					for day in range(1, end_day + 1):
-						if year > 2023:
-							link = f'https://archive.sensor.community/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{self.sensor_type}_sensor_{self.sensor_ID}.csv'
-						if year <= 2023:
-							link = f'https://archive.sensor.community/{year}/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{self.sensor_type}_sensor_{self.sensor_ID}.csv.gz'
-						self.urls.append(link)
-		else: print('Ungültige Eingabe')
+		self.urls = []
+		start = self.start_month
+		end = self.end_month
+		for year in range(self.start_year, self.end_year + 1):
+			if self.start_year < self.end_year:
+				if year == self.start_year:
+					end = 12
+				if self.start_year < year < self.end_year:
+					start = 1
+					end = 12
+				if year == self.end_year:
+					start = 1
+					end = self.end_month        
+			for month in range(start, end + 1):
+				end_day = monthrange(year, month)[1]
+				# Wenn year = aktuelles Jahr und month = aktueller Monat, darf for day in range() nur bis zum vorherigen Tag gehen
+				if year == current_year and month == current_month:
+					end_day = current_day - 1
+				for day in range(1, end_day + 1):
+					if year > 2023:
+						link = f'https://archive.sensor.community/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{self.sensor_type}_sensor_{self.sensor_ID}.csv'
+					if year <= 2023:
+						link = f'https://archive.sensor.community/{year}/{year}-{month:02d}-{day:02d}/{year}-{month:02d}-{day:02d}_{self.sensor_type}_sensor_{self.sensor_ID}.csv.gz'
+					self.urls.append(link)
+		print(f'{len(self.urls)} urls generiert')
 
 	def download_csv(self):
+		self.downloads = 0
+
 		for url in self.urls:
-			response = requests.get(url)
 			url_end = url.rfind('/')
 			file_name = url[url_end:]
 			file_Path = 'Feinstaubprojekt_Assmann_Derkach/files' + file_name
 
-			if response.status_code == 200:
-				# Datei herunterladen
+			try:
+				response = requests.get(url)
+				response.raise_for_status()
+
 				with open(file_Path, 'wb') as file:
 					file.write(response.content)
 				# Wenn komprimierte Datei, dann entpacken und kopieren
@@ -112,23 +103,20 @@ class Analyticsdata():
 					# Komprimierte Datei löschen
 					if os.path.exists(file_Path):
 						os.remove(file_Path)
-					else:
-						print('The file does not exist')
-				print(f'File {file_name} downloaded successfully')
-			else:
-				print(f'Download fehlgeschlagen; url {url} existiert nicht')
 
-# Hier Datenbankverbindung aufbauen
+				self.downloads += 1
+				print(f'Datei {file_name} erfolgreich heruntergeladen')
 
-
-# Hier GUI zusammenbauen
-# Elemente:
-	# Eingabefeld (SensorID: int)
-	# Comboboxen (2 mal, nebeneinander für start und end datum)
-		# Jahr
-		# Monat
-# Aus den Eingaben ein Klassenobjekt erstellen
-# Erstmal bis dahin
+			except requests.exceptions.HTTPError as http_err:
+				print(f'HTTP-Fehler bei {url}: {http_err}')
+			except requests.exceptions.ConnectionError as conn_err:
+				print(f'Verbindungsfehler bei {url}: {conn_err}')
+			except requests.exceptions.Timeout as timeout_err:
+				print(f'Zeitüberschreitung bei {url}: {timeout_err}')
+			except requests.exceptions.RequestException as req_err:
+				print(f'Allgemeiner Fehler bei {url}: {req_err}')
+			except Exception as e:
+				print(f'Anderer Fehler bei {url}: {e}')
 
 class EingabeGUI():
 	def __init__(self):
@@ -199,9 +187,23 @@ class EingabeGUI():
 		button_frame.grid(row=5, column=0, columnspan=2, pady=10)
 
 		self.create_button = ttk.Button(button_frame, text='Analyseobjekt erstellen', command=self.create_analytics_object)
-		self.create_button.grid(row=0, column=0, sticky='w')
+		self.create_button.grid(row=0, column=1, sticky='nsew')
 
+		self.download_button = ttk.Button(button_frame, text='Daten herunterladen', command=self.download_data, state='disabled')
+		self.download_button.grid(row=1, column=1, sticky='nsew')
 
+		# Status Label
+		self.status_label = ttk.Label(main_frame, text='Bereit für Eingabe', foreground='blue')
+		self.status_label.grid(row=6, column=0, columnspan=2, pady=10)
+
+		# Monatslisten initialisieren
+		self.update_month_combos()
+		
+		# Standard-Werte setzen
+		self.start_year_combo.set('2023')
+		self.end_year_combo.set('2023')
+		self.start_month_combo.set('1')
+		self.end_month_combo.set('12')
 
 	def update_month_combos(self):
 		# Aktualisiert die Monat-Comboboxen basierend auf den ausgewählten Jahren
@@ -290,7 +292,7 @@ class EingabeGUI():
 			self.analytics_data = Analyticsdata(sensor_id, start_year, end_year, start_month, end_month)
 			
 			# URLs generieren
-			self.analytics_data.GenerateUrls()
+			self.analytics_data.generate_urls()
 			
 			# Status aktualisieren
 			self.status_label.config(text=f'Analyseobjekt erstellt für Sensor {sensor_id} '
