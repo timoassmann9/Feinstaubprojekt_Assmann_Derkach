@@ -9,7 +9,7 @@ import sqlite3 as sql
 import tkinter as tk
 from tkinter import ttk
 
-class analyticsdata():
+class Analyticsdata():
 	def __init__(self, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
 		self.sensor_type = 'sds011'
 		self.sensor_ID = sensor_ID
@@ -28,7 +28,7 @@ class analyticsdata():
 		self.start_month = int(self.start_month)
 		self.end_month = int(self.end_month)
 
-	def GenerateUrls(self):
+	def generate_urls(self):
 		# Datumsvariablen
 		now = datetime.now()
 		current_year = now.year
@@ -132,30 +132,90 @@ class analyticsdata():
 class EingabeGUI():
 	def __init__(self):
 		self.root = tk.Tk()
-		self.root.title('Zeitraum auswählen')
-		self.root.geometry('400x300')
+		self.root.title('Feinstaubdaten - Zeitraum auswählen')
+		self.root.geometry('500x400')
+		self.root.resizable(False, False)
 
-		frame1 = ttk.Frame(self.root, padding=10, relief='raised')
-		frame1.grid(row=0, column=0, rowspan=2, columnspan=1, sticky='nsew')
+		# Speicherung Analyticsdata object
+		self.analytics_data = None
 
-		frame2 = ttk.Frame(self.root, padding=10, relief='raised')
-		frame2.grid(row=2, column=0, sticky='NSEW')
+		self.root.columnconfigure(0, weight=1)
+		self.root.rowconfigure(0, weight=1)
 
-		ttk.Label(frame1, text='SensorID:', width=50).grid(column=0, row=0, sticky='NSEW')
-		entry = ttk.Entry(frame1)
-		entry.grid(column=0, row=1, sticky='nsew', pady=5)
-		entry.insert(0, 'SensorID')
-		
-		ttk.Label(frame2, text='Startjahr:').grid(column=0, row=2, sticky='w')
-		combo = ttk.Combobox(frame2, values=[x for x in range(2015, datetime.now().year + 1)])
-		combo.grid(column=0, row=3, sticky='w', pady=5)
+		# Hauptframe
+		main_frame = ttk.Frame(self.root, padding=20)
+		main_frame.grid(row=0, column=0, sticky='nsew')
+		main_frame.columnconfigure(1, weight=1)
 
-		ttk.Label(frame2, text='Startmonat:').grid(column=1, row=2, sticky='w')
-		combo = ttk.Combobox(frame2, values=[x for x in range(1, 13)])
-		combo.grid(column=1, row=3, sticky='w', pady=5)
+		# Titel
+		title_label = ttk.Label(main_frame, text='Feinstaubdaten Analyse', font=('Arial', 16, 'bold'))
+		title_label.grid(row=0, column=0, columnspan=2, pady=20)
 
+		# Eingabe SensorID
+		ttk.Label(main_frame, text='SensorID', font=('Arial', 10, 'bold')).grid(row=1, column=0, sticky='w', pady=5)
+
+		# Startdatum Frame
+		start_frame = ttk.Labelframe(main_frame, text='Startdatum', padding=10)
+		start_frame.grid(row=3, column=0, columnspan=2, sticky='ew', pady=10)
+		start_frame.columnconfigure(1, weight=1)
+		start_frame.rowconfigure(3, weight=1)
+
+		# Combobox Startjahr
+		ttk.Label(start_frame, text='Jahr:').grid(row=0, column=0, sticky='w', padx=5)
+		self.start_year_combo = ttk.Combobox(start_frame, width=10, state='readonly')
+		self.start_year_combo['values'] = [str(x) for x in range(2015, datetime.now().year + 1)]
+		self.start_year_combo.grid(row=0, column=1, sticky='w', padx=15)
+		self.start_year_combo.bind('<<ComboboxSelected>>', self.on_start_year_change)
+
+		# Combobox Startmonat
+		ttk.Label(start_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=5)
+		self.start_month_combo = ttk.Combobox(start_frame, width=10, state='readonly')
+		self.start_month_combo.grid(row=0, column=3, sticky='w')
+
+		# Enddatum Frame
+		end_frame = ttk.Labelframe(main_frame, text='Enddatum', padding=10)
+		end_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=20)
+		end_frame.columnconfigure(1, weight=1)
+		end_frame.rowconfigure(3, weight=1)
+
+		# Combobox Endjahr
+		ttk.Label(start_frame, text='Jahr:').grid(row=0, column=0, sticky='w', padx=5)
+		self.end_year_combo = ttk.Combobox(end_frame, width=10, state='readonly')
+		self.end_year_combo['values'] = [str(x) for x in range(2015, datetime.now().year + 1)]
+		self.end_year_combo.grid(row=0, column=1, sticky='w', padx=15)
+		self.end_year_combo.bind('<<ComboboxSelected>>', self.on_end_year_change)
+
+		# Combobox Endmonat
+		ttk.Label(end_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=5)
+		self.end_month_combo = ttk.Combobox(end_frame, width=10, state='readonly')
+		self.end_month_combo.grid(row=0, column=3, sticky='w')
+
+		# Button Frame
+		button_frame = ttk.Frame(main_frame)
+		button_frame.grid(row=5, column=0, columnspan=2, pady=10)
+
+		self.create_button = ttk.Button(button_frame, text='')
+
+	def update_month_combos(self):
+		# Aktualisiert die Monat-Comboboxen basierend auf den ausgewählten Jahren
+		current_year = datetime.now().year
+		current_month = datetime.now().month
+
+		start_year = self.start_year_combo.get()
+		if start_year:
+			if  int(start_year) == 2015:
+				start_months = [str(x) for x in range(10, 13)]
+			elif int(start_year) == current_year:
+				start_months = [str(x) for x in range(1, current_month + 1)]
+			else:
+				start_months = [str(x) for x in range(1, 13)]
+			self.start_month_combo['values'] = start_months
+
+	def on_start_year_change(self, event):
+		# Callback für die Änderung des Startjahres
+		self.update_month_combos()
 
 EingabeGUI().root.mainloop()
-mydata = analyticsdata('11', 2015, 2017, 2, 5)
+mydata = Analyticsdata('11', 2015, 2017, 2, 5)
 print(mydata.urls)
-mydata.GenerateUrls()
+mydata.generate_urls()
