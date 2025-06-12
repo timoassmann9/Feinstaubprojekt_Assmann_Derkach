@@ -8,6 +8,7 @@ import os
 import sqlite3 as sql
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 
 class Analyticsdata():
 	def __init__(self, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
@@ -149,44 +150,47 @@ class EingabeGUI():
 
 		# Titel
 		title_label = ttk.Label(main_frame, text='Feinstaubdaten Analyse', font=('Arial', 16, 'bold'))
-		title_label.grid(row=0, column=0, columnspan=2, pady=20)
+		title_label.grid(row=0, column=0, columnspan=2, pady=(0, 20))
 
 		# Eingabe SensorID
-		ttk.Label(main_frame, text='SensorID', font=('Arial', 10, 'bold')).grid(row=1, column=0, sticky='w', pady=5)
+		ttk.Label(main_frame, text='SensorID', font=('Arial', 10, 'bold')).grid(row=1, column=0, sticky='w', pady=(0, 5))
+		
+		self.sensor_entry = ttk.Entry(main_frame, width=30)
+		self.sensor_entry.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(0, 20))
 
 		# Startdatum Frame
 		start_frame = ttk.Labelframe(main_frame, text='Startdatum', padding=10)
-		start_frame.grid(row=3, column=0, columnspan=2, sticky='ew', pady=10)
+		start_frame.grid(row=3, column=0, columnspan=2, sticky='ew', pady=(0, 10))
 		start_frame.columnconfigure(1, weight=1)
 		start_frame.rowconfigure(3, weight=1)
 
 		# Combobox Startjahr
-		ttk.Label(start_frame, text='Jahr:').grid(row=0, column=0, sticky='w', padx=5)
+		ttk.Label(start_frame, text='Jahr:').grid(row=0, column=0, sticky='w', padx=(0, 5))
 		self.start_year_combo = ttk.Combobox(start_frame, width=10, state='readonly')
 		self.start_year_combo['values'] = [str(x) for x in range(2015, datetime.now().year + 1)]
-		self.start_year_combo.grid(row=0, column=1, sticky='w', padx=15)
+		self.start_year_combo.grid(row=0, column=1, sticky='w', padx=(0, 15))
 		self.start_year_combo.bind('<<ComboboxSelected>>', self.on_start_year_change)
 
 		# Combobox Startmonat
-		ttk.Label(start_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=5)
+		ttk.Label(start_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=(0, 5))
 		self.start_month_combo = ttk.Combobox(start_frame, width=10, state='readonly')
 		self.start_month_combo.grid(row=0, column=3, sticky='w')
 
 		# Enddatum Frame
 		end_frame = ttk.Labelframe(main_frame, text='Enddatum', padding=10)
-		end_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=20)
+		end_frame.grid(row=4, column=0, columnspan=2, sticky='ew', pady=(0, 10))
 		end_frame.columnconfigure(1, weight=1)
 		end_frame.rowconfigure(3, weight=1)
 
 		# Combobox Endjahr
-		ttk.Label(start_frame, text='Jahr:').grid(row=0, column=0, sticky='w', padx=5)
+		ttk.Label(end_frame, text='Jahr:').grid(row=0, column=0, sticky='w', padx=(0, 5))
 		self.end_year_combo = ttk.Combobox(end_frame, width=10, state='readonly')
 		self.end_year_combo['values'] = [str(x) for x in range(2015, datetime.now().year + 1)]
-		self.end_year_combo.grid(row=0, column=1, sticky='w', padx=15)
+		self.end_year_combo.grid(row=0, column=1, sticky='w', padx=(0, 15))
 		self.end_year_combo.bind('<<ComboboxSelected>>', self.on_end_year_change)
 
 		# Combobox Endmonat
-		ttk.Label(end_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=5)
+		ttk.Label(end_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=(0, 5))
 		self.end_month_combo = ttk.Combobox(end_frame, width=10, state='readonly')
 		self.end_month_combo.grid(row=0, column=3, sticky='w')
 
@@ -194,7 +198,10 @@ class EingabeGUI():
 		button_frame = ttk.Frame(main_frame)
 		button_frame.grid(row=5, column=0, columnspan=2, pady=10)
 
-		self.create_button = ttk.Button(button_frame, text='')
+		self.create_button = ttk.Button(button_frame, text='Analyseobjekt erstellen', command=self.create_analytics_object)
+		self.create_button.grid(row=0, column=0, sticky='w')
+
+
 
 	def update_month_combos(self):
 		# Aktualisiert die Monat-Comboboxen basierend auf den ausgewählten Jahren
@@ -211,9 +218,121 @@ class EingabeGUI():
 				start_months = [str(x) for x in range(1, 13)]
 			self.start_month_combo['values'] = start_months
 
+		end_year = self.end_year_combo.get()
+		if end_year:
+			if  int(end_year) == 2015:
+				end_months = [str(x) for x in range(10, 13)]
+			elif int(end_year) == current_year:
+				end_months = [str(x) for x in range(1, current_month + 1)]
+			else:
+				end_months = [str(x) for x in range(1, 13)]
+			self.end_month_combo['values'] = end_months
+
 	def on_start_year_change(self, event):
 		# Callback für die Änderung des Startjahres
 		self.update_month_combos()
+		if self.start_month_combo.get() not in self.start_month_combo['values']:
+			if self.start_month_combo['values']:
+				self.start_month_combo.set(self.start_month_combo['values'][0])
+
+	def on_end_year_change(self, event):
+		# Callback für die Änderung des Endjahres
+		self.update_month_combos()
+		if self.end_month_combo.get() not in self.end_month_combo['values']:
+			if self.end_month_combo['values']:
+				self.end_month_combo.set(self.end_month_combo['values'][0])
+
+	def validate_input(self):
+		# Validiert die Benutzereingaben
+		# Sensor ID prüfen
+		sensor_id = self.sensor_entry.get().strip()
+		if not sensor_id or sensor_id == 'SensorID':
+			messagebox.showerror('Fehler', 'Bitte geben Sie eine gültige Sensor ID ein.')
+			return False
+		
+		# Prüfen, ob alle Felder ausgefüllt sind
+		if not all([self.start_year_combo.get(), self.start_month_combo.get(),
+					self.end_year_combo.get(), self.end_month_combo.get()]):
+			messagebox.showerror('Fehler', 'Bitte füllen Sie alle Datumfelder aus.')
+			return False
+		
+		# Datum-Logik prüfen
+		try:
+			start_year = int(self.start_year_combo.get())
+			start_month = int(self.start_month_combo.get())
+			end_year = int(self.end_year_combo.get())
+			end_month = int(self.end_month_combo.get())
+			
+			# Startdatum darf nicht nach Enddatum liegen
+			if start_year > end_year or (start_year == end_year and start_month > end_month):
+				messagebox.showerror('Fehler', 'Das Startdatum darf nicht nach dem Enddatum liegen.')
+				return False
+			
+			return True
+			
+		except ValueError:
+			messagebox.showerror('Fehler', 'Ungültige Datumswerte.')
+			return False
+
+	def create_analytics_object(self):
+		# Erstellt das analyticsdata Objekt nach Validierung
+		if not self.validate_input():
+			return
+		
+		try:
+			sensor_id = self.sensor_entry.get().strip()
+			start_year = int(self.start_year_combo.get())
+			start_month = int(self.start_month_combo.get())
+			end_year = int(self.end_year_combo.get())
+			end_month = int(self.end_month_combo.get())
+			
+			# Analyticsdata Objekt erstellen
+			self.analytics_data = Analyticsdata(sensor_id, start_year, end_year, start_month, end_month)
+			
+			# URLs generieren
+			self.analytics_data.GenerateUrls()
+			
+			# Status aktualisieren
+			self.status_label.config(text=f'Analyseobjekt erstellt für Sensor {sensor_id} '
+									f'({start_month}/{start_year} - {end_month}/{end_year})', 
+									foreground='green')
+			
+			# Download-Button aktivieren
+			self.download_button.config(state='normal')
+			
+			messagebox.showinfo('Erfolg', 
+							   f'Analyseobjekt erfolgreich erstellt!\n'
+							   f'Sensor ID: {sensor_id}\n'
+							   f'Zeitraum: {start_month}/{start_year} - {end_month}/{end_year}\n'
+							   f'Anzahl URLs: {len(self.analytics_data.urls)}')
+			
+		except Exception as e:
+			messagebox.showerror('Fehler', f'Fehler beim Erstellen des Objekts: {str(e)}')
+			self.status_label.config(text='Fehler beim Erstellen des Objekts', foreground='red')
+	
+	def download_data(self):
+		# Startet den Download der Daten
+		if self.analytics_data is None:
+			messagebox.showerror('Fehler', 'Erstellen Sie zuerst ein Analyseobjekt.')
+			return
+		
+		try:
+			self.status_label.config(text='Download läuft...', foreground='orange')
+			self.download_button.config(state='disabled')
+			self.create_button.config(state='disabled')
+			
+			# Download in separatem Thread wäre besser, aber für Einfachheit hier direkt
+			self.analytics_data.download_csv()
+			
+			self.status_label.config(text='Download abgeschlossen!', foreground='green')
+			messagebox.showinfo('Download', 'Datendownload erfolgreich abgeschlossen!')
+			
+		except Exception as e:
+			messagebox.showerror('Fehler', f'Fehler beim Download: {str(e)}')
+			self.status_label.config(text='Download fehlgeschlagen', foreground='red')
+		finally:
+			self.download_button.config(state='normal')
+			self.create_button.config(state='normal')
 
 EingabeGUI().root.mainloop()
 mydata = Analyticsdata('11', 2015, 2017, 2, 5)
