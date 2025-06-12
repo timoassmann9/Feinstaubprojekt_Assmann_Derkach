@@ -84,6 +84,8 @@ class Analyticsdata():
 	def download_csv(self):
 		self.downloads = 0
 
+		# hinzufügen: wenn /files noch nicht existiert, dann erstellen
+
 		for url in self.urls:
 			url_end = url.rfind('/')
 			file_name = url[url_end:]
