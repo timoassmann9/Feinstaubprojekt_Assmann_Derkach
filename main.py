@@ -22,6 +22,7 @@ class Analyticsdata():
 		self.end_month = end_month
 		self.urls = []
 		self.downloads = None
+		self.database_path = 'Feinstaubprojekt_Assmann_Derkach/feinstaubdaten.db'
 
 		# Formatierung Variablen
 		self.sensor_ID = str(self.sensor_ID)
@@ -31,6 +32,121 @@ class Analyticsdata():
 		self.end_year = int(self.end_year)
 		self.start_month = int(self.start_month)
 		self.end_month = int(self.end_month)
+
+	def create_database_table(self):
+		#Erstellt die Datenbanktabelle falls sie noch nicht existiert
+		try:
+			con = sql.connect(self.database_path)
+			cur = con.cursor()
+			
+			cur.execute('''
+				CREATE TABLE IF NOT EXISTS Feinstaubanalyse (
+					UID TEXT PRIMARY KEY,
+					SensorID TEXT,
+					DatumZeit TEXT,
+					PM2_5 REAL,
+					PM10 REAL,
+					Standort INTEGER,
+					lat REAL,
+					lon REAL
+				)
+			''')
+			
+			con.commit()
+			con.close()
+			print('Datenbanktabelle erstellt/überprüft')
+			
+		except Exception as e:
+			print(f'Fehler beim Erstellen der Datenbanktabelle: {e}')
+
+	def import_csv_to_database(self, csv_file_path):
+		# Importiert eine CSV-Datei in die SQLite-Datenbank
+		try:
+			con = sql.connect(self.database_path)
+			cur = con.cursor()
+			
+			file_name = os.path.basename(csv_file_path)
+			imported_count = 0
+			skipped_count = 0
+			
+			with open(csv_file_path, 'r', encoding='utf-8') as file:
+				reader = DictReader(file, delimiter=';')
+				count = 1
+				
+				for row in reader:
+					try:
+						sensor_id = row['sensor_id']
+						datumzeit = row['timestamp']
+						pm2_5 = float(row['P1']) if row['P1'] else None
+						pm10 = float(row['P2']) if row['P2'] else None
+						standort = int(row['location']) if row['location'] else None
+						lat = float(row['lat']) if row['lat'] else None
+						lon = float(row['lon']) if row['lon'] else None
+
+						uid = f'{file_name}_{count}'
+
+						# Prüfen, ob der Datensatz bereits existiert
+						result_exists = cur.execute('SELECT 1 FROM Feinstaubanalyse WHERE UID = ?', (uid,)).fetchone()
+						
+						if result_exists is None:
+							data = {
+								'UID': uid,
+								'SensorID': sensor_id,
+								'DatumZeit': datumzeit, 
+								'PM2_5': pm2_5, 
+								'PM10': pm10, 
+								'Standort': standort, 
+								'lat': lat, 
+								'lon': lon
+							}
+							
+							cur.execute('INSERT INTO Feinstaubanalyse VALUES(:UID, :SensorID, :DatumZeit, :PM2_5, :PM10, :Standort, :lat, :lon)', data)
+							imported_count += 1
+						else:
+							skipped_count += 1
+
+						count += 1
+						
+					except (ValueError, KeyError) as e:
+						print(f'Fehler beim Verarbeiten von Zeile {count} in {file_name}: {e}')
+						count += 1
+			
+			con.commit()
+			con.close()
+			
+			print(f'Import von {file_name} abgeschlossen: {imported_count} neue Datensätze, {skipped_count} übersprungen')
+			return imported_count, skipped_count
+			
+		except Exception as e:
+			print(f'Fehler beim Importieren der Datei {csv_file_path}: {e}')
+			return 0, 0
+
+	def import_all_csv_files(self):
+		# Importiert alle CSV-Dateien aus dem files-Ordner in die Datenbank
+		files_directory = 'Feinstaubprojekt_Assmann_Derkach/files'
+		
+		if not os.path.exists(files_directory):
+			print('Files-Verzeichnis existiert nicht')
+			return 0, 0
+		
+		# Datenbanktabelle erstellen
+		self.create_database_table()
+		
+		total_imported = 0
+		total_skipped = 0
+		processed_files = 0
+		
+		# Alle CSV-Dateien im Verzeichnis durchgehen
+		for filename in os.listdir(files_directory):
+			if filename.endswith('.csv'):
+				file_path = os.path.join(files_directory, filename)
+				imported, skipped = self.import_csv_to_database(file_path)
+				total_imported += imported
+				total_skipped += skipped
+				processed_files += 1
+		
+		print(f'Gesamtimport abgeschlossen: {processed_files} Dateien verarbeitet, {total_imported} neue Datensätze importiert, {total_skipped} übersprungen')
+		return total_imported, total_skipped
 
 	def generate_urls(self):
 		# Datumsvariablen
