@@ -1,7 +1,9 @@
 from calendar import monthrange
 from datetime import datetime
+import time
 from csv import DictReader
 import requests
+import threading
 import gzip
 import shutil
 import os
@@ -84,13 +86,21 @@ class Analyticsdata():
 	def download_csv(self):
 		self.downloads = 0
 
-		# hinzufügen: wenn /files noch nicht existiert, dann erstellen
+		# wenn directory 'files' noch nicht existiert, dann erstellen
+		try:
+			os.mkdir('Feinstaubprojekt_Assmann_Derkach/files')
+			print('Directory "files" wurde erstellt')
+		except FileExistsError:
+			print('Directory "files" existiert bereits')
+		except Exception as e:
+			print(f'Ein Fehler ist aufgetreten: {e}')
 
 		for url in self.urls:
 			url_end = url.rfind('/')
 			file_name = url[url_end:]
 			file_Path = 'Feinstaubprojekt_Assmann_Derkach/files' + file_name
-			if os.path.exists(file_Path):
+			file_path_unpacked = file_Path[:-3]
+			if os.path.exists(file_Path) or os.path.exists(file_path_unpacked):
 				print(f'Datei {file_name} existiert bereits')
 				continue
 
@@ -103,7 +113,7 @@ class Analyticsdata():
 				# Wenn komprimierte Datei, dann entpacken und kopieren
 				if file_Path.endswith('.gz'):
 					with gzip.open(file_Path, 'rb') as f_in:
-						with open(file_Path[:-3], 'wb') as f_out:
+						with open(file_path_unpacked, 'wb') as f_out:
 							shutil.copyfileobj(f_in, f_out)
 					# Komprimierte Datei löschen
 					if os.path.exists(file_Path):
@@ -200,15 +210,15 @@ class EingabeGUI():
 		# Status Label
 		self.status_label = ttk.Label(main_frame, text='Bereit für Eingabe', foreground='blue')
 		self.status_label.grid(row=6, column=0, columnspan=2, pady=10)
-
-		# Monatslisten initialisieren
-		self.update_month_combos()
 		
 		# Standard-Werte setzen
 		self.start_year_combo.set('2023')
 		self.end_year_combo.set('2023')
 		self.start_month_combo.set('1')
 		self.end_month_combo.set('12')
+
+		# Monatslisten initialisieren
+		self.update_month_combos()
 
 	def update_month_combos(self):
 		# Aktualisiert die Monat-Comboboxen basierend auf den ausgewählten Jahren
@@ -282,7 +292,7 @@ class EingabeGUI():
 			return False
 
 	def create_analytics_object(self):
-		# Erstellt das analyticsdata Objekt nach Validierung
+		# Erstellt das Analyticsdata Objekt nach Validierung
 		if not self.validate_input():
 			return
 		
@@ -322,25 +332,42 @@ class EingabeGUI():
 		if self.analytics_data is None:
 			messagebox.showerror('Fehler', 'Erstellen Sie zuerst ein Analyseobjekt.')
 			return
-		
+
 		try:
 			self.status_label.config(text='Download läuft...', foreground='orange')
 			self.download_button.config(state='disabled')
 			self.create_button.config(state='disabled')
-			
-			# Download in separatem Thread wäre besser, aber für Einfachheit hier direkt
-			self.analytics_data.download_csv()
-			
-			self.status_label.config(text='Download abgeschlossen!', foreground='green')
-			messagebox.showinfo('Download', f'{self.analytics_data.downloads} Dateien wurden erfolgreich heruntergeladen!')
+
+			# Download in separatem Thread
+			self.download_thread = threading.Thread(target=self.analytics_data.download_csv)
+			self.download_thread.start()
+
+			# Prüfen, ob der Thread noch läuft
+			self.check_download_thread()
 			
 		except Exception as e:
 			messagebox.showerror('Fehler', f'Fehler beim Download: {str(e)}')
 			self.status_label.config(text='Download fehlgeschlagen', foreground='red')
-		finally:
 			self.download_button.config(state='normal')
 			self.create_button.config(state='normal')
 
+	def check_download_thread(self):
+		if self.download_thread.is_alive():
+			self.root.after(500, self.check_download_thread)
+		else:
+			self.status_label.config(text='Download abgeschlossen!', foreground='green')
+			self.download_button.config(state='normal')
+			self.create_button.config(state='normal')
+			if self.analytics_data.downloads > 0:
+				messagebox.showinfo('Download', f'{self.analytics_data.downloads} Dateien wurden erfolgreich heruntergeladen!')
+			if self.analytics_data.downloads == 0:
+				messagebox.showinfo('Download', f'Es wurden keine neuen Dateien heruntergeladen.')
+
+
 EingabeGUI().root.mainloop()
+
+# next step: Analyticsdata Objekt links neben Knöpfen anzeigen. Bei jeder Änderung aktualisieren. if None, keine Einträge. def update_analyticsdata
+# Nur noch download Button behalten
+
 
 # sensor ids ermitteln: requests mit vielen ids stellen, wenn funktioniert, speichern
