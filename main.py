@@ -158,7 +158,9 @@ class EingabeGUI():
 		# Eingabe SensorID
 		ttk.Label(main_frame, text='SensorID', font=('Arial', 10, 'bold')).grid(row=1, column=0, sticky='w', pady=(0, 5))
 		
-		self.sensor_entry = ttk.Entry(main_frame, width=30)
+		self.sensor_entry_text = tk.StringVar()
+		self.sensor_entry_text.trace_add('write', self.create_or_update_analytics_object_and_label)
+		self.sensor_entry = ttk.Entry(main_frame, width=30, textvariable=self.sensor_entry_text)
 		self.sensor_entry.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(0, 20))
 
 		# Startdatum Frame
@@ -173,11 +175,13 @@ class EingabeGUI():
 		self.start_year_combo['values'] = [str(x) for x in range(2015, datetime.now().year + 1)]
 		self.start_year_combo.grid(row=0, column=1, sticky='w', padx=(0, 15))
 		self.start_year_combo.bind('<<ComboboxSelected>>', self.on_start_year_change)
+		self.start_year_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label, add='+')
 
 		# Combobox Startmonat
 		ttk.Label(start_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=(0, 5))
 		self.start_month_combo = ttk.Combobox(start_frame, width=10, state='readonly')
 		self.start_month_combo.grid(row=0, column=3, sticky='w')
+		self.start_month_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label)
 
 		# Enddatum Frame
 		end_frame = ttk.Labelframe(main_frame, text='Enddatum', padding=10)
@@ -191,20 +195,29 @@ class EingabeGUI():
 		self.end_year_combo['values'] = [str(x) for x in range(2015, datetime.now().year + 1)]
 		self.end_year_combo.grid(row=0, column=1, sticky='w', padx=(0, 15))
 		self.end_year_combo.bind('<<ComboboxSelected>>', self.on_end_year_change)
+		self.end_year_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label, add='+')
 
 		# Combobox Endmonat
 		ttk.Label(end_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=(0, 5))
 		self.end_month_combo = ttk.Combobox(end_frame, width=10, state='readonly')
 		self.end_month_combo.grid(row=0, column=3, sticky='w')
+		self.end_month_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label)
+
+		# Objektstatus Frame
+		object_frame = ttk.Labelframe(main_frame, text='Daten', padding=10)
+		object_frame.grid(row=5, column=0, columnspan=1, sticky='ew', pady=(0, 5))
+
+		self.analytics_label = ttk.Label(object_frame)
+		self.analytics_label.grid(row=0, column=0, sticky='w')
 
 		# Button Frame
 		button_frame = ttk.Frame(main_frame)
 		button_frame.grid(row=5, column=0, columnspan=2, pady=10)
 
-		self.create_button = ttk.Button(button_frame, text='Analyseobjekt erstellen', command=self.create_analytics_object)
-		self.create_button.grid(row=0, column=1, sticky='nsew')
+		self.validate_button = ttk.Button(button_frame, text='Daten überprüfen', command=self.validate_input)
+		self.validate_button.grid(row=0, column=1, sticky='nsew')
 
-		self.download_button = ttk.Button(button_frame, text='Daten herunterladen', command=self.download_data, state='disabled')
+		self.download_button = ttk.Button(button_frame, text='Dateien herunterladen', command=self.download_data, state='disabled')
 		self.download_button.grid(row=1, column=1, sticky='nsew')
 
 		# Status Label
@@ -258,18 +271,22 @@ class EingabeGUI():
 		if self.end_month_combo.get() not in self.end_month_combo['values']:
 			if self.end_month_combo['values']:
 				self.end_month_combo.set(self.end_month_combo['values'][0])
-
+	
 	def validate_input(self):
 		# Validiert die Benutzereingaben
 		# Sensor ID prüfen
-		sensor_id = self.sensor_entry.get().strip()
+		sensor_id = self.sensor_entry_text.get().strip()
 		if not sensor_id or sensor_id == 'SensorID':
+			self.status_label.config(text='Ungültige Werte', foreground='red')
+			self.download_button.config(state='disabled')
 			messagebox.showerror('Fehler', 'Bitte geben Sie eine gültige Sensor ID ein.')
 			return False
 		
 		# Prüfen, ob alle Felder ausgefüllt sind
 		if not all([self.start_year_combo.get(), self.start_month_combo.get(),
 					self.end_year_combo.get(), self.end_month_combo.get()]):
+			self.status_label.config(text='Ungültige Werte', foreground='red')
+			self.download_button.config(state='disabled')
 			messagebox.showerror('Fehler', 'Bitte füllen Sie alle Datumfelder aus.')
 			return False
 		
@@ -282,22 +299,23 @@ class EingabeGUI():
 			
 			# Startdatum darf nicht nach Enddatum liegen
 			if start_year > end_year or (start_year == end_year and start_month > end_month):
+				self.status_label.config(text='Ungültige Werte', foreground='red')
+				self.download_button.config(state='disabled')
 				messagebox.showerror('Fehler', 'Das Startdatum darf nicht nach dem Enddatum liegen.')
 				return False
 			
-			return True
+			self.status_label.config(text='Bereit für Download', foreground='green')
+			self.download_button.config(state='normal')
 			
 		except ValueError:
+			self.status_label.config(text='Ungültige Werte', foreground='red')
+			self.download_button.config(state='disabled')
 			messagebox.showerror('Fehler', 'Ungültige Datumswerte.')
 			return False
 
-	def create_analytics_object(self):
-		# Erstellt das Analyticsdata Objekt nach Validierung
-		if not self.validate_input():
-			return
-		
+	def create_or_update_analytics_object_and_label(self, event, *args):		
 		try:
-			sensor_id = self.sensor_entry.get().strip()
+			sensor_id = self.sensor_entry_text.get().strip()
 			start_year = int(self.start_year_combo.get())
 			start_month = int(self.start_month_combo.get())
 			end_year = int(self.end_year_combo.get())
@@ -305,27 +323,22 @@ class EingabeGUI():
 			
 			# Analyticsdata Objekt erstellen
 			self.analytics_data = Analyticsdata(sensor_id, start_year, end_year, start_month, end_month)
-			
-			# URLs generieren
-			self.analytics_data.generate_urls()
-			
-			# Status aktualisieren
-			self.status_label.config(text=f'Analyseobjekt erstellt für Sensor {sensor_id} '
-									f'({start_month}/{start_year} - {end_month}/{end_year})', 
-									foreground='green')
-			
-			# Download-Button aktivieren
-			self.download_button.config(state='normal')
-			
-			messagebox.showinfo('Erfolg', 
-							   f'Analyseobjekt erfolgreich erstellt!\n'
-							   f'Sensor ID: {sensor_id}\n'
-							   f'Zeitraum: {start_month}/{start_year} - {end_month}/{end_year}\n'
-							   f'Anzahl URLs: {len(self.analytics_data.urls)}')
+						
+			self.update_analytics_label()
 			
 		except Exception as e:
 			messagebox.showerror('Fehler', f'Fehler beim Erstellen des Objekts: {str(e)}')
 			self.status_label.config(text='Fehler beim Erstellen des Objekts', foreground='red')
+
+	def update_analytics_label(self):
+		sensor_id = self.analytics_data.sensor_ID
+		start_year = self.analytics_data.start_year
+		start_month = self.analytics_data.start_month
+		end_year = self.analytics_data.end_year
+		end_month = self.analytics_data.end_month
+		num_urls = len(self.analytics_data.urls)
+
+		self.analytics_label.config(text=f'SensorID: {sensor_id}\nZeitraum: {start_month}/{start_year} - {end_month}/{end_year}\nAnzahl URLs: {num_urls}')
 	
 	def download_data(self):
 		# Startet den Download der Daten
@@ -333,10 +346,16 @@ class EingabeGUI():
 			messagebox.showerror('Fehler', 'Erstellen Sie zuerst ein Analyseobjekt.')
 			return
 
+		# URLs generieren
+		self.analytics_data.generate_urls()
+					
+		# Download-Button aktivieren
+		self.download_button.config(state='normal')
+
 		try:
 			self.status_label.config(text='Download läuft...', foreground='orange')
 			self.download_button.config(state='disabled')
-			self.create_button.config(state='disabled')
+			self.validate_button.config(state='disabled')
 
 			# Download in separatem Thread
 			self.download_thread = threading.Thread(target=self.analytics_data.download_csv)
@@ -349,7 +368,7 @@ class EingabeGUI():
 			messagebox.showerror('Fehler', f'Fehler beim Download: {str(e)}')
 			self.status_label.config(text='Download fehlgeschlagen', foreground='red')
 			self.download_button.config(state='normal')
-			self.create_button.config(state='normal')
+			self.validate_button.config(state='normal')
 
 	def check_download_thread(self):
 		if self.download_thread.is_alive():
@@ -357,7 +376,7 @@ class EingabeGUI():
 		else:
 			self.status_label.config(text='Download abgeschlossen!', foreground='green')
 			self.download_button.config(state='normal')
-			self.create_button.config(state='normal')
+			self.validate_button.config(state='normal')
 			if self.analytics_data.downloads > 0:
 				messagebox.showinfo('Download', f'{self.analytics_data.downloads} Dateien wurden erfolgreich heruntergeladen!')
 			if self.analytics_data.downloads == 0:
