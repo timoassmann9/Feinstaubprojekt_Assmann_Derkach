@@ -160,6 +160,7 @@ class EingabeGUI():
 		
 		self.sensor_entry_text = tk.StringVar()
 		self.sensor_entry_text.trace_add('write', self.create_or_update_analytics_object_and_label)
+		self.sensor_entry_text.trace_add('write', self.reset_status_label_and_download_button)
 		self.sensor_entry = ttk.Entry(main_frame, width=30, textvariable=self.sensor_entry_text)
 		self.sensor_entry.grid(row=2, column=0, columnspan=2, sticky='ew', pady=(0, 20))
 
@@ -176,12 +177,14 @@ class EingabeGUI():
 		self.start_year_combo.grid(row=0, column=1, sticky='w', padx=(0, 15))
 		self.start_year_combo.bind('<<ComboboxSelected>>', self.on_start_year_change)
 		self.start_year_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label, add='+')
+		self.start_year_combo.bind('<<ComboboxSelected>>', self.reset_status_label_and_download_button, add='+')
 
 		# Combobox Startmonat
 		ttk.Label(start_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=(0, 5))
 		self.start_month_combo = ttk.Combobox(start_frame, width=10, state='readonly')
 		self.start_month_combo.grid(row=0, column=3, sticky='w')
 		self.start_month_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label)
+		self.start_month_combo.bind('<<ComboboxSelected>>', self.reset_status_label_and_download_button, add='+')
 
 		# Enddatum Frame
 		end_frame = ttk.Labelframe(main_frame, text='Enddatum', padding=10)
@@ -196,12 +199,14 @@ class EingabeGUI():
 		self.end_year_combo.grid(row=0, column=1, sticky='w', padx=(0, 15))
 		self.end_year_combo.bind('<<ComboboxSelected>>', self.on_end_year_change)
 		self.end_year_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label, add='+')
+		self.end_year_combo.bind('<<ComboboxSelected>>', self.reset_status_label_and_download_button, add='+')
 
 		# Combobox Endmonat
 		ttk.Label(end_frame, text='Monat:').grid(row=0, column=2, sticky='w', padx=(0, 5))
 		self.end_month_combo = ttk.Combobox(end_frame, width=10, state='readonly')
 		self.end_month_combo.grid(row=0, column=3, sticky='w')
 		self.end_month_combo.bind('<<ComboboxSelected>>', self.create_or_update_analytics_object_and_label)
+		self.end_month_combo.bind('<<ComboboxSelected>>', self.reset_status_label_and_download_button, add='+')
 
 		# Objektstatus Frame
 		object_frame = ttk.Labelframe(main_frame, text='Daten', padding=10)
@@ -232,6 +237,11 @@ class EingabeGUI():
 
 		# Monatslisten initialisieren
 		self.update_month_combos()
+
+	def reset_status_label_and_download_button(self, event, *args):
+		# Setzt statuslabel und downloadbutton zurück, wenn Einträge geändert werden
+		self.status_label.config(text='Bereit für Eingabe', foreground='blue')
+		self.download_button.config(state='disabled')
 
 	def update_month_combos(self):
 		# Aktualisiert die Monat-Comboboxen basierend auf den ausgewählten Jahren
@@ -306,7 +316,11 @@ class EingabeGUI():
 			
 			self.status_label.config(text='Bereit für Download', foreground='green')
 			self.download_button.config(state='normal')
-			
+
+			# URLs generieren
+			self.analytics_data.generate_urls()
+			self.update_analytics_label()
+
 		except ValueError:
 			self.status_label.config(text='Ungültige Werte', foreground='red')
 			self.download_button.config(state='disabled')
@@ -321,7 +335,7 @@ class EingabeGUI():
 			end_year = int(self.end_year_combo.get())
 			end_month = int(self.end_month_combo.get())
 			
-			# Analyticsdata Objekt erstellen
+			# Analyticsdata Objekt erstellen/updaten
 			self.analytics_data = Analyticsdata(sensor_id, start_year, end_year, start_month, end_month)
 						
 			self.update_analytics_label()
@@ -345,13 +359,7 @@ class EingabeGUI():
 		if self.analytics_data is None:
 			messagebox.showerror('Fehler', 'Erstellen Sie zuerst ein Analyseobjekt.')
 			return
-
-		# URLs generieren
-		self.analytics_data.generate_urls()
-					
-		# Download-Button aktivieren
-		self.download_button.config(state='normal')
-
+		
 		try:
 			self.status_label.config(text='Download läuft...', foreground='orange')
 			self.download_button.config(state='disabled')
@@ -384,9 +392,5 @@ class EingabeGUI():
 
 
 EingabeGUI().root.mainloop()
-
-# next step: Analyticsdata Objekt links neben Knöpfen anzeigen. Bei jeder Änderung aktualisieren. if None, keine Einträge. def update_analyticsdata
-# Nur noch download Button behalten
-
 
 # sensor ids ermitteln: requests mit vielen ids stellen, wenn funktioniert, speichern
