@@ -11,6 +11,13 @@ import sqlite3 as sql
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.figure import Figure
+import pandas as pd
+from tkinter import filedialog
+import numpy as np
+
 
 class Analyticsdata():
 	def __init__(self, sensor_ID: str, start_year: int, end_year: int, start_month: int, end_month: int):
@@ -148,6 +155,39 @@ class Analyticsdata():
 		print(f'Gesamtimport abgeschlossen: {processed_files} Dateien verarbeitet, {total_imported} neue Datensätze importiert, {total_skipped} übersprungen')
 		return total_imported, total_skipped
 
+	def get_data_for_analysis(self):
+    # Lädt die Daten aus der Datenbank für die Analyse
+		try:
+			con = sql.connect(self.database_path)
+			
+			# SQL-Query um Daten für den spezifischen Sensor und Zeitraum zu holen
+			query = '''
+			SELECT DatumZeit, PM2_5, PM10 
+			FROM Feinstaubanalyse 
+			WHERE SensorID = ? 
+			AND DATE(DatumZeit) BETWEEN ? AND ?
+			ORDER BY DatumZeit
+			'''
+			
+			# Zeitraum-Strings erstellen
+			start_date = f'{self.start_year}-{self.start_month:02d}-01'
+			end_date = f'{self.end_year}-{self.end_month:02d}-31'
+			
+			df = pd.read_sql_query(query, con, params=(self.sensor_ID, start_date, end_date))
+			con.close()
+			
+			# Datum-Spalte konvertieren
+			df['DatumZeit'] = pd.to_datetime(df['DatumZeit'])
+			
+			# Null-Werte entfernen
+			df = df.dropna()
+			
+			return df
+			
+		except Exception as e:
+			print(f'Fehler beim Laden der Daten: {e}')
+			return pd.DataFrame()
+
 	def generate_urls(self):
 		# Datumsvariablen
 		now = datetime.now()
@@ -249,12 +289,241 @@ class Analyticsdata():
 			except Exception as e:
 				print(f'Anderer Fehler bei {url}: {e}')
 
-class EingabeGUI():
+class AnalysisWindow:
+    def __init__(self, parent, analytics_data):
+        self.parent = parent
+        self.analytics_data = analytics_data
+        self.data = None
+        
+        # Neues Fenster erstellen
+        self.window = tk.Toplevel(parent)
+        self.window.title('Feinstaubdaten Analyse')
+        self.window.geometry('1200x800')
+        
+        # Daten laden
+        self.load_data()
+        
+        # GUI erstellen
+        self.create_widgets()
+        
+        # Erstes Diagramm anzeigen
+        self.update_plot()
+    
+    def load_data(self):
+        # Lädt die Daten für die Analyse
+        self.data = self.analytics_data.get_data_for_analysis()
+        
+        if self.data.empty:
+            messagebox.showwarning('Warnung', 'Keine Daten für den ausgewählten Zeitraum gefunden!')
+            self.window.destroy()
+            return
+    
+    def create_widgets(self):
+        # Erstellt die GUI-Elemente
+        # Hauptframe
+        main_frame = ttk.Frame(self.window)
+        main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+        
+        # Kontroll-Frame oben
+        control_frame = ttk.Frame(main_frame)
+        control_frame.pack(fill='x', pady=(0, 10))
+        
+        # Diagrammtyp-Auswahl
+        ttk.Label(control_frame, text='Diagrammtyp:').pack(side='left', padx=(0, 5))
+        self.plot_type = tk.StringVar(value='line')
+        plot_combo = ttk.Combobox(control_frame, textvariable=self.plot_type, 
+                                 values=['line', 'scatter', 'bar', 'histogram'], 
+                                 state='readonly', width=15)
+        plot_combo.pack(side='left', padx=(0, 20))
+        plot_combo.bind('<<ComboboxSelected>>', lambda e: self.update_plot())
+        
+        # Parameter-Auswahl
+        ttk.Label(control_frame, text='Parameter:').pack(side='left', padx=(0, 5))
+        self.parameter = tk.StringVar(value='both')
+        param_combo = ttk.Combobox(control_frame, textvariable=self.parameter,
+                                  values=['both', 'PM2_5', 'PM10'],
+                                  state='readonly', width=15)
+        param_combo.pack(side='left', padx=(0, 20))
+        param_combo.bind('<<ComboboxSelected>>', lambda e: self.update_plot())
+        
+        # Export-Buttons
+        ttk.Button(control_frame, text='Als PNG exportieren', 
+                  command=self.export_png).pack(side='right', padx=(5, 0))
+        ttk.Button(control_frame, text='Als PDF exportieren', 
+                  command=self.export_pdf).pack(side='right', padx=(5, 0))
+        
+        # Matplotlib Figure und Canvas
+        self.fig = Figure(figsize=(12, 8), dpi=100)
+        self.canvas = FigureCanvasTkAgg(self.fig, main_frame)
+        self.canvas.get_tk_widget().pack(fill='both', expand=True)
+        
+        # Toolbar für Zoom/Pan
+        toolbar = NavigationToolbar2Tk(self.canvas, main_frame)
+        toolbar.update()
+        
+        # Statistik-Frame unten
+        stats_frame = ttk.LabelFrame(main_frame, text='Statistiken', padding=10)
+        stats_frame.pack(fill='x', pady=(10, 0))
+        
+        self.stats_label = ttk.Label(stats_frame, text='', font=('Arial', 10))
+        self.stats_label.pack()
+    
+    def calculate_statistics(self):
+        # Berechnet Statistiken für die Daten
+        if self.data.empty:
+            return 'Keine Daten verfügbar'
+        
+        stats_text = ''
+        
+        if self.parameter.get() == 'both' or self.parameter.get() == 'PM2_5':
+            pm25_data = self.data['PM2_5'].dropna()
+            if not pm25_data.empty:
+                stats_text += f'PM2.5: Min={pm25_data.min():.2f}, Max={pm25_data.max():.2f}, '
+                stats_text += f'Durchschnitt={pm25_data.mean():.2f}, Median={pm25_data.median():.2f}\n'
+        
+        if self.parameter.get() == 'both' or self.parameter.get() == 'PM10':
+            pm10_data = self.data['PM10'].dropna()
+            if not pm10_data.empty:
+                stats_text += f'PM10: Min={pm10_data.min():.2f}, Max={pm10_data.max():.2f}, '
+                stats_text += f'Durchschnitt={pm10_data.mean():.2f}, Median={pm10_data.median():.2f}'
+        
+        return stats_text
+    
+    def update_plot(self):
+        # Aktualisiert das Diagramm
+        if self.data.empty:
+            return
+        
+        # Figure leeren
+        self.fig.clear()
+        ax = self.fig.add_subplot(111)
+        
+        plot_type = self.plot_type.get()
+        parameter = self.parameter.get()
+        
+        # Titel setzen
+        sensor_id = self.analytics_data.sensor_ID
+        start_date = f'{self.analytics_data.start_month}/{self.analytics_data.start_year}'
+        end_date = f'{self.analytics_data.end_month}/{self.analytics_data.end_year}'
+        title = f'Feinstaubdaten Sensor {sensor_id} ({start_date} - {end_date})'
+        ax.set_title(title, fontsize=14, fontweight='bold')
+        
+        # Daten plotten basierend auf Auswahl
+        if plot_type == 'line':
+            if parameter == 'both':
+                ax.plot(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue', alpha=0.7)
+                ax.plot(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red', alpha=0.7)
+            elif parameter == 'PM2_5':
+                ax.plot(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue')
+            else:
+                ax.plot(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red')
+                
+        elif plot_type == 'scatter':
+            if parameter == 'both':
+                ax.scatter(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue', alpha=0.6, s=1)
+                ax.scatter(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red', alpha=0.6, s=1)
+            elif parameter == 'PM2_5':
+                ax.scatter(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue', s=1)
+            else:
+                ax.scatter(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red', s=1)
+                
+        elif plot_type == 'histogram':
+            if parameter == 'both':
+                ax.hist(self.data['PM2_5'].dropna(), bins=50, alpha=0.7, label='PM2.5', color='blue')
+                ax.hist(self.data['PM10'].dropna(), bins=50, alpha=0.7, label='PM10', color='red')
+                ax.set_xlabel('Konzentration (µg/m³)')
+                ax.set_ylabel('Häufigkeit')
+            elif parameter == 'PM2_5':
+                ax.hist(self.data['PM2_5'].dropna(), bins=50, color='blue', label='PM2.5')
+                ax.set_xlabel('PM2.5 Konzentration (µg/m³)')
+                ax.set_ylabel('Häufigkeit')
+            else:
+                ax.hist(self.data['PM10'].dropna(), bins=50, color='red', label='PM10')
+                ax.set_xlabel('PM10 Konzentration (µg/m³)')
+                ax.set_ylabel('Häufigkeit')
+                
+        elif plot_type == 'bar':
+            # Für Bar-Chart: Tagesdurchschnitte berechnen
+            daily_data = self.data.copy()
+            daily_data['Date'] = daily_data['DatumZeit'].dt.date
+            daily_avg = daily_data.groupby('Date').agg({'PM2_5': 'mean', 'PM10': 'mean'}).reset_index()
+            
+            if parameter == 'both':
+                x = np.arange(len(daily_avg))
+                width = 0.35
+                ax.bar(x - width/2, daily_avg['PM2_5'], width, label='PM2.5', color='blue', alpha=0.7)
+                ax.bar(x + width/2, daily_avg['PM10'], width, label='PM10', color='red', alpha=0.7)
+                ax.set_xticks(x[::max(1, len(x)//10)])  # Nur jeden 10. Tick anzeigen
+                ax.set_xticklabels([str(d) for d in daily_avg['Date'].iloc[::max(1, len(daily_avg)//10)]], rotation=45)
+            elif parameter == 'PM2_5':
+                ax.bar(range(len(daily_avg)), daily_avg['PM2_5'], color='blue', label='PM2.5')
+                ax.set_xticks(range(0, len(daily_avg), max(1, len(daily_avg)//10)))
+                ax.set_xticklabels([str(d) for d in daily_avg['Date'].iloc[::max(1, len(daily_avg)//10)]], rotation=45)
+            else:
+                ax.bar(range(len(daily_avg)), daily_avg['PM10'], color='red', label='PM10')
+                ax.set_xticks(range(0, len(daily_avg), max(1, len(daily_avg)//10)))
+                ax.set_xticklabels([str(d) for d in daily_avg['Date'].iloc[::max(1, len(daily_avg)//10)]], rotation=45)
+        
+        # Achsenbeschriftungen und Legende (außer für Histogram)
+        if plot_type != 'histogram' and plot_type != 'bar':
+            ax.set_xlabel('Datum')
+            ax.set_ylabel('Konzentration (µg/m³)')
+            # X-Achse formatieren
+            self.fig.autofmt_xdate()
+        elif plot_type == 'bar':
+            ax.set_xlabel('Datum')
+            ax.set_ylabel('Tagesdurchschnitt (µg/m³)')
+        
+        # Legende hinzufügen
+        if parameter == 'both' or plot_type == 'histogram':
+            ax.legend()
+        
+        # Grid hinzufügen
+        ax.grid(True, alpha=0.3)
+        
+        # Layout optimieren
+        self.fig.tight_layout()
+        
+        # Canvas aktualisieren
+        self.canvas.draw()
+        
+        # Statistiken aktualisieren
+        self.stats_label.config(text=self.calculate_statistics())
+    
+    def export_png(self):
+        # Exportiert das Diagramm als PNG
+        filename = filedialog.asksaveasfilename(
+            defaultextension='.png',
+            filetypes=[('PNG files', '*.png'), ('All files', '*.*')],
+            title='PNG speichern unter...'
+        )
+        if filename:
+            try:
+                self.fig.savefig(filename, dpi=300, bbox_inches='tight')
+                messagebox.showinfo('Export', f'Diagramm erfolgreich als PNG gespeichert:\n{filename}')
+            except Exception as e:
+                messagebox.showerror('Fehler', f'Fehler beim Speichern der PNG-Datei:\n{str(e)}')
+    
+    def export_pdf(self):
+        # Exportiert das Diagramm als PDF
+        filename = filedialog.asksaveasfilename(
+            defaultextension='.pdf',
+            filetypes=[('PDF files', '*.pdf'), ('All files', '*.*')],
+            title='PDF speichern unter...'
+        )
+        if filename:
+            try:
+                self.fig.savefig(filename, format='pdf', bbox_inches='tight')
+                messagebox.showinfo('Export', f'Diagramm erfolgreich als PDF gespeichert:\n{filename}')
+            except Exception as e:
+                messagebox.showerror('Fehler', f'Fehler beim Speichern der PDF-Datei:\n{str(e)}')
+
+class GUI():
 	def __init__(self):
 		self.root = tk.Tk()
 		self.root.title('Feinstaubdaten - Zeitraum auswählen')
 		self.root.geometry('500x400')
-		self.root.resizable(False, False)
+		# self.root.resizable(False, False)
 
 		# Speicherung Analyticsdata object
 		self.analytics_data = None
@@ -341,6 +610,12 @@ class EingabeGUI():
 		self.download_button = ttk.Button(button_frame, text='Dateien herunterladen', command=self.download_data, state='disabled')
 		self.download_button.grid(row=1, column=1, sticky='nsew')
 
+		self.import_button = ttk.Button(button_frame, text='Datenbank aktualisieren', command=self.import_data, state='disabled')
+		self.import_button.grid(row=2, column=1, sticky='nsew')
+
+		self.analysis_button = ttk.Button(button_frame, text='Daten analysieren', command=self.open_analysis_window)
+		self.analysis_button.grid(row=3, column=1, sticky='nsew')
+
 		# Status Label
 		self.status_label = ttk.Label(main_frame, text='Bereit für Eingabe', foreground='blue')
 		self.status_label.grid(row=6, column=0, columnspan=2, pady=10)
@@ -358,6 +633,7 @@ class EingabeGUI():
 		# Setzt statuslabel und downloadbutton zurück, wenn Einträge geändert werden
 		self.status_label.config(text='Bereit für Eingabe', foreground='blue')
 		self.download_button.config(state='disabled')
+		self.import_button.config(state='disabled')
 
 	def update_month_combos(self):
 		# Aktualisiert die Monat-Comboboxen basierend auf den ausgewählten Jahren
@@ -405,6 +681,7 @@ class EingabeGUI():
 		if not sensor_id or sensor_id == 'SensorID':
 			self.status_label.config(text='Ungültige Werte', foreground='red')
 			self.download_button.config(state='disabled')
+			self.import_button.config(state='disabled')
 			messagebox.showerror('Fehler', 'Bitte geben Sie eine gültige Sensor ID ein.')
 			return False
 		
@@ -413,6 +690,7 @@ class EingabeGUI():
 					self.end_year_combo.get(), self.end_month_combo.get()]):
 			self.status_label.config(text='Ungültige Werte', foreground='red')
 			self.download_button.config(state='disabled')
+			self.import_button.config(state='disabled')
 			messagebox.showerror('Fehler', 'Bitte füllen Sie alle Datumfelder aus.')
 			return False
 		
@@ -427,6 +705,7 @@ class EingabeGUI():
 			if start_year > end_year or (start_year == end_year and start_month > end_month):
 				self.status_label.config(text='Ungültige Werte', foreground='red')
 				self.download_button.config(state='disabled')
+				self.import_button.config(state='disabled')
 				messagebox.showerror('Fehler', 'Das Startdatum darf nicht nach dem Enddatum liegen.')
 				return False
 			
@@ -440,6 +719,7 @@ class EingabeGUI():
 		except ValueError:
 			self.status_label.config(text='Ungültige Werte', foreground='red')
 			self.download_button.config(state='disabled')
+			self.import_button.config(state='disabled')
 			messagebox.showerror('Fehler', 'Ungültige Datumswerte.')
 			return False
 
@@ -480,6 +760,7 @@ class EingabeGUI():
 			self.status_label.config(text='Download läuft...', foreground='orange')
 			self.download_button.config(state='disabled')
 			self.validate_button.config(state='disabled')
+			self.import_button.config(state='disabled')
 
 			# Download in separatem Thread
 			self.download_thread = threading.Thread(target=self.analytics_data.download_csv)
@@ -493,6 +774,7 @@ class EingabeGUI():
 			self.status_label.config(text='Download fehlgeschlagen', foreground='red')
 			self.download_button.config(state='normal')
 			self.validate_button.config(state='normal')
+			self.import_button.config(state='disabled')
 
 	def check_download_thread(self):
 		if self.download_thread.is_alive():
@@ -501,12 +783,68 @@ class EingabeGUI():
 			self.status_label.config(text='Download abgeschlossen!', foreground='green')
 			self.download_button.config(state='normal')
 			self.validate_button.config(state='normal')
+			self.import_button.config(state='normal')
 			if self.analytics_data.downloads > 0:
 				messagebox.showinfo('Download', f'{self.analytics_data.downloads} Dateien wurden erfolgreich heruntergeladen!')
 			if self.analytics_data.downloads == 0:
 				messagebox.showinfo('Download', f'Es wurden keine neuen Dateien heruntergeladen.')
 
+	def import_data(self):
+		# Startet den Import der CSV-Dateien in die Datenbank
+		if self.analytics_data is None:
+			messagebox.showerror('Fehler', 'Erstellen Sie zuerst ein Analyseobjekt.')
+			return
+		
+		try:
+			self.status_label.config(text='Import läuft...', foreground='orange')
+			self.download_button.config(state='disabled')
+			self.validate_button.config(state='disabled')
+			self.import_button.config(state='disabled')
 
-EingabeGUI().root.mainloop()
+			# Import in separatem Thread
+			self.import_thread = threading.Thread(target=self.run_import)
+			self.import_thread.start()
 
-# sensor ids ermitteln: requests mit vielen ids stellen, wenn funktioniert, speichern
+			# Prüfen, ob der Thread noch läuft
+			self.check_import_thread()
+			
+		except Exception as e:
+			messagebox.showerror('Fehler', f'Fehler beim Import: {str(e)}')
+			self.status_label.config(text='Import fehlgeschlagen', foreground='red')
+			self.download_button.config(state='normal')
+			self.validate_button.config(state='normal')
+			self.import_button.config(state='normal')
+
+	def run_import(self):
+		# Führt den tatsächlichen Import aus (wird in separatem Thread ausgeführt)
+		self.import_results = self.analytics_data.import_all_csv_files()
+
+	def check_import_thread(self):
+		if self.import_thread.is_alive():
+			self.root.after(500, self.check_import_thread)
+		else:
+			self.status_label.config(text='Import abgeschlossen!', foreground='green')
+			self.download_button.config(state='normal')
+			self.validate_button.config(state='normal')
+			self.import_button.config(state='normal')
+			
+			imported, skipped = self.import_results
+			messagebox.showinfo('Import', f'Import abgeschlossen!\n{imported} neue Datensätze importiert\n{skipped} Datensätze übersprungen (bereits vorhanden)')
+
+	def open_analysis_window(self):
+		# Öffnet das Analysefenster
+		if self.analytics_data is None:
+			messagebox.showerror('Fehler', 'Erstellen Sie zuerst ein Analyseobjekt.')
+			return
+		
+		# Prüfen ob Datenbank existiert
+		if not os.path.exists(self.analytics_data.database_path):
+			messagebox.showerror('Fehler', 'Datenbank nicht gefunden. Bitte erst Daten importieren.')
+			return
+		
+		try:
+			AnalysisWindow(self.root, self.analytics_data)
+		except Exception as e:
+			messagebox.showerror('Fehler', f'Fehler beim Öffnen des Analysefensters:\n{str(e)}')
+
+GUI().root.mainloop()
