@@ -1,6 +1,5 @@
 from calendar import monthrange
 from datetime import datetime
-import time
 from csv import DictReader
 import requests
 import threading
