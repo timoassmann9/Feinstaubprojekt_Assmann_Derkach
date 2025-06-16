@@ -156,7 +156,7 @@ class Analyticsdata():
 		return total_imported, total_skipped
 
 	def get_data_for_analysis(self):
-    # Lädt die Daten aus der Datenbank für die Analyse
+		# Lädt die Daten aus der Datenbank für die Analyse
 		try:
 			con = sql.connect(self.database_path)
 			
@@ -170,17 +170,46 @@ class Analyticsdata():
 			'''
 			
 			# Zeitraum-Strings erstellen
-			start_date = f'{self.start_year}-{self.start_month:02d}-01'
-			end_date = f'{self.end_year}-{self.end_month:02d}-31'
+			start_date = f"{self.start_year}-{self.start_month:02d}-01"
+			end_date = f"{self.end_year}-{self.end_month:02d}-31"
 			
-			df = pd.read_sql_query(query, con, params=(self.sensor_ID, start_date, end_date))
+			# Daten als rohe Liste laden
+			cur = con.cursor()
+			cur.execute(query, (self.sensor_ID, start_date, end_date))
+			raw_data = cur.fetchall()
 			con.close()
 			
-			# Datum-Spalte konvertieren
-			df['DatumZeit'] = pd.to_datetime(df['DatumZeit'])
+			# Manuell DataFrame erstellen
+			data_list = []
+			for row in raw_data:
+				try:
+					# Verschiedene Datetime-Formate probieren
+					date_str = row[0]
+					try:
+						# Standard ISO Format
+						dt = pd.to_datetime(date_str, format='%Y-%m-%dT%H:%M:%S')
+					except:
+						try:
+							# Mit Mikrosekunden
+							dt = pd.to_datetime(date_str, format='%Y-%m-%dT%H:%M:%S.%f')
+						except:
+							# Automatische Erkennung
+							dt = pd.to_datetime(date_str, errors='coerce')
+					
+					if pd.notna(dt):  # Nur wenn Datum gültig ist
+						data_list.append({
+							'DatumZeit': dt,
+							'PM2_5': row[1],
+							'PM10': row[2]
+						})
+				except Exception as e:
+					print(f'Fehler bei Zeile {row}: {e}')
+					continue
+			
+			df = pd.DataFrame(data_list)
 			
 			# Null-Werte entfernen
-			df = df.dropna()
+			df = df.dropna(subset=['PM2_5', 'PM10'], how='all')
 			
 			return df
 			
@@ -332,7 +361,7 @@ class AnalysisWindow:
         ttk.Label(control_frame, text='Diagrammtyp:').pack(side='left', padx=(0, 5))
         self.plot_type = tk.StringVar(value='line')
         plot_combo = ttk.Combobox(control_frame, textvariable=self.plot_type, 
-                                 values=['line', 'scatter', 'bar', 'histogram'], 
+                                 values=['line', 'scatter', 'bar'], 
                                  state='readonly', width=15)
         plot_combo.pack(side='left', padx=(0, 20))
         plot_combo.bind('<<ComboboxSelected>>', lambda e: self.update_plot())
@@ -353,7 +382,7 @@ class AnalysisWindow:
                   command=self.export_pdf).pack(side='right', padx=(5, 0))
         
         # Matplotlib Figure und Canvas
-        self.fig = Figure(figsize=(12, 8), dpi=100)
+        self.fig = Figure(figsize=(12, 6), dpi=100)
         self.canvas = FigureCanvasTkAgg(self.fig, main_frame)
         self.canvas.get_tk_widget().pack(fill='both', expand=True)
         
@@ -363,9 +392,9 @@ class AnalysisWindow:
         
         # Statistik-Frame unten
         stats_frame = ttk.LabelFrame(main_frame, text='Statistiken', padding=10)
-        stats_frame.pack(fill='x', pady=(10, 0))
+        stats_frame.pack(fill='both', expand=True, pady=(10, 0))
         
-        self.stats_label = ttk.Label(stats_frame, text='', font=('Arial', 10))
+        self.stats_label = ttk.Label(stats_frame, text='', font=('Arial', 12))
         self.stats_label.pack()
     
     def calculate_statistics(self):
@@ -408,43 +437,57 @@ class AnalysisWindow:
         title = f'Feinstaubdaten Sensor {sensor_id} ({start_date} - {end_date})'
         ax.set_title(title, fontsize=14, fontweight='bold')
         
+        # Zeitstempel für matplotlib vorbereiten
+        plot_data = self.data.copy()
+        # Zeitzone normalisieren - erst alle zu UTC konvertieren, dann entfernen
+        plot_data['DatumZeit'] = pd.to_datetime(plot_data['DatumZeit'], utc=True).dt.tz_convert(None)
+        
+        # Y-Achsen-Limits für bessere Sichtbarkeit der Werte berechnen
+        y_values = []
+        if parameter == 'both':
+            y_values.extend(plot_data['PM2_5'].dropna().values)
+            y_values.extend(plot_data['PM10'].dropna().values)
+        elif parameter == 'PM2_5':
+            y_values = plot_data['PM2_5'].dropna().values
+        else:
+            y_values = plot_data['PM10'].dropna().values
+        
+        if len(y_values) > 0:
+            y_min = np.min(y_values)
+            y_max = np.max(y_values)
+            # Puffer hinzufügen für bessere Sichtbarkeit
+            y_range = y_max - y_min
+            if y_range > 0:
+                y_padding = y_range * 0.1  # 10% Puffer
+                y_bottom = max(0, y_min - y_padding)  # Nicht unter 0 gehen
+                y_top = y_max + y_padding
+            else:
+                # Falls alle Werte gleich sind
+                y_bottom = max(0, y_min - 1)
+                y_top = y_max + 1
+        
         # Daten plotten basierend auf Auswahl
         if plot_type == 'line':
             if parameter == 'both':
-                ax.plot(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue', alpha=0.7)
-                ax.plot(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red', alpha=0.7)
+                ax.plot(plot_data['DatumZeit'], plot_data['PM2_5'], label='PM2.5', color='blue', alpha=0.7)
+                ax.plot(plot_data['DatumZeit'], plot_data['PM10'], label='PM10', color='red', alpha=0.7)
             elif parameter == 'PM2_5':
-                ax.plot(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue')
+                ax.plot(plot_data['DatumZeit'], plot_data['PM2_5'], label='PM2.5', color='blue')
             else:
-                ax.plot(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red')
+                ax.plot(plot_data['DatumZeit'], plot_data['PM10'], label='PM10', color='red')
                 
         elif plot_type == 'scatter':
             if parameter == 'both':
-                ax.scatter(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue', alpha=0.6, s=1)
-                ax.scatter(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red', alpha=0.6, s=1)
+                ax.scatter(plot_data['DatumZeit'], plot_data['PM2_5'], label='PM2.5', color='blue', alpha=0.6, s=1)
+                ax.scatter(plot_data['DatumZeit'], plot_data['PM10'], label='PM10', color='red', alpha=0.6, s=1)
             elif parameter == 'PM2_5':
-                ax.scatter(self.data['DatumZeit'], self.data['PM2_5'], label='PM2.5', color='blue', s=1)
+                ax.scatter(plot_data['DatumZeit'], plot_data['PM2_5'], label='PM2.5', color='blue', s=1)
             else:
-                ax.scatter(self.data['DatumZeit'], self.data['PM10'], label='PM10', color='red', s=1)
-                
-        elif plot_type == 'histogram':
-            if parameter == 'both':
-                ax.hist(self.data['PM2_5'].dropna(), bins=50, alpha=0.7, label='PM2.5', color='blue')
-                ax.hist(self.data['PM10'].dropna(), bins=50, alpha=0.7, label='PM10', color='red')
-                ax.set_xlabel('Konzentration (µg/m³)')
-                ax.set_ylabel('Häufigkeit')
-            elif parameter == 'PM2_5':
-                ax.hist(self.data['PM2_5'].dropna(), bins=50, color='blue', label='PM2.5')
-                ax.set_xlabel('PM2.5 Konzentration (µg/m³)')
-                ax.set_ylabel('Häufigkeit')
-            else:
-                ax.hist(self.data['PM10'].dropna(), bins=50, color='red', label='PM10')
-                ax.set_xlabel('PM10 Konzentration (µg/m³)')
-                ax.set_ylabel('Häufigkeit')
+                ax.scatter(plot_data['DatumZeit'], plot_data['PM10'], label='PM10', color='red', s=1)
                 
         elif plot_type == 'bar':
             # Für Bar-Chart: Tagesdurchschnitte berechnen
-            daily_data = self.data.copy()
+            daily_data = plot_data.copy()
             daily_data['Date'] = daily_data['DatumZeit'].dt.date
             daily_avg = daily_data.groupby('Date').agg({'PM2_5': 'mean', 'PM10': 'mean'}).reset_index()
             
@@ -463,19 +506,43 @@ class AnalysisWindow:
                 ax.bar(range(len(daily_avg)), daily_avg['PM10'], color='red', label='PM10')
                 ax.set_xticks(range(0, len(daily_avg), max(1, len(daily_avg)//10)))
                 ax.set_xticklabels([str(d) for d in daily_avg['Date'].iloc[::max(1, len(daily_avg)//10)]], rotation=45)
+            
+            # Y-Limits für Bar-Chart aus den Tagesdurchschnitten berechnen
+            if parameter == 'both':
+                bar_values = list(daily_avg['PM2_5'].dropna()) + list(daily_avg['PM10'].dropna())
+            elif parameter == 'PM2_5':
+                bar_values = list(daily_avg['PM2_5'].dropna())
+            else:
+                bar_values = list(daily_avg['PM10'].dropna())
+            
+            if len(bar_values) > 0:
+                y_min = np.min(bar_values)
+                y_max = np.max(bar_values)
+                y_range = y_max - y_min
+                if y_range > 0:
+                    y_padding = y_range * 0.1
+                    y_bottom = max(0, y_min - y_padding)
+                    y_top = y_max + y_padding
+                else:
+                    y_bottom = max(0, y_min - 1)
+                    y_top = y_max + 1
         
-        # Achsenbeschriftungen und Legende (außer für Histogram)
-        if plot_type != 'histogram' and plot_type != 'bar':
+        # Y-Achsen-Limits setzen für bessere Sichtbarkeit
+        if len(y_values) > 0 or (plot_type == 'bar' and len(bar_values) > 0):
+            ax.set_ylim(y_bottom, y_top)
+        
+        # Achsenbeschriftungen und Legende
+        if plot_type != 'bar':
             ax.set_xlabel('Datum')
             ax.set_ylabel('Konzentration (µg/m³)')
             # X-Achse formatieren
             self.fig.autofmt_xdate()
-        elif plot_type == 'bar':
+        else:
             ax.set_xlabel('Datum')
             ax.set_ylabel('Tagesdurchschnitt (µg/m³)')
         
         # Legende hinzufügen
-        if parameter == 'both' or plot_type == 'histogram':
+        if parameter == 'both':
             ax.legend()
         
         # Grid hinzufügen
@@ -522,7 +589,7 @@ class GUI():
 	def __init__(self):
 		self.root = tk.Tk()
 		self.root.title('Feinstaubdaten - Zeitraum auswählen')
-		self.root.geometry('500x400')
+		self.root.geometry('800x600')
 		# self.root.resizable(False, False)
 
 		# Speicherung Analyticsdata object
