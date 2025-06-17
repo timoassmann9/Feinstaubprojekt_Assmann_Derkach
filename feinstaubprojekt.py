@@ -273,7 +273,8 @@ class Analyticsdata():
 
 		# wenn directory 'files' noch nicht existiert, dann erstellen
 		try:
-			os.mkdir('Feinstaubprojekt_Assmann_Derkach/files')
+			dir_path = os.path.join(self.main_dir, 'files')
+			os.mkdir(dir_path)
 			print('Directory "files" wurde erstellt')
 		except FileExistsError:
 			print('Directory "files" existiert bereits')
@@ -281,9 +282,8 @@ class Analyticsdata():
 			print(f'Ein Fehler ist aufgetreten: {e}')
 
 		for url in self.urls:
-			url_end = url.rfind('/')
-			file_name = url[url_end:]
-			file_Path = 'Feinstaubprojekt_Assmann_Derkach/files' + file_name
+			file_name = os.path.basename(url)
+			file_Path = os.path.join(dir_path, file_name)
 			file_path_unpacked = file_Path[:-3]
 			if os.path.exists(file_Path) or os.path.exists(file_path_unpacked):
 				print(f'Datei {file_name} existiert bereits')
