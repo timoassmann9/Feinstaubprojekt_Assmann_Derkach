@@ -28,7 +28,8 @@ class Analyticsdata():
 		self.end_month = end_month
 		self.urls = []
 		self.downloads = None
-		self.database_path = 'Feinstaubprojekt_Assmann_Derkach/feinstaubdaten.db'
+		self.main_dir = os.path.dirname(os.path.abspath(__file__))
+		self.database_path = os.path.join(self.main_dir, 'feinstaubdaten.db')
 
 		# Formatierung Variablen
 		self.sensor_ID = str(self.sensor_ID)
@@ -129,7 +130,7 @@ class Analyticsdata():
 
 	def import_all_csv_files(self):
 		# Importiert alle CSV-Dateien aus dem files-Ordner in die Datenbank
-		files_directory = 'Feinstaubprojekt_Assmann_Derkach/files'
+		files_directory = os.path.join(self.main_dir, 'files')
 		
 		if not os.path.exists(files_directory):
 			print('Files-Verzeichnis existiert nicht')
